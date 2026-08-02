@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Vagrant
+.vagrant/
+
+# Entornos y secretos
+.env
+.env.*
+*.key
+*.pem
+
+# Archivos generados y configuración local
+*.zip
+.DS_Store
+.idea/
+.vscode/

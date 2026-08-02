@@ -1,0 +1,109 @@
+---
+- name: Deploy Flask application
+  hosts: webservers
+  become: true
+
+  vars:
+    flask_app_dir: /opt/flask-app
+
+  tasks:
+    - name: Install system packages
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - python3
+          - python3-venv
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create Flask service user
+      ansible.builtin.user:
+        name: flask
+        system: true
+        create_home: false
+        shell: /usr/sbin/nologin
+
+    - name: Create Flask application directory
+      ansible.builtin.file:
+        path: "{{ flask_app_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Copy Flask application
+      ansible.builtin.copy:
+        src: app.py
+        dest: "{{ flask_app_dir }}/app.py"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Flask application
+
+    - name: Install Flask in a virtual environment
+      ansible.builtin.pip:
+        name: Flask==3.1.3
+        virtualenv: "{{ flask_app_dir }}/.venv"
+        virtualenv_command: /usr/bin/python3 -m venv
+      notify: Restart Flask application
+
+    - name: Install Flask systemd unit
+      ansible.builtin.template:
+        src: templates/flask-app.service.j2
+        dest: /etc/systemd/system/flask-app.service
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Flask application
+
+    - name: Enable and start Flask application
+      ansible.builtin.systemd_service:
+        name: flask-app
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Install Nginx virtual host
+      ansible.builtin.template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/flask-app
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Nginx
+
+    - name: Enable Flask Nginx virtual host
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/flask-app
+        dest: /etc/nginx/sites-enabled/flask-app
+        state: link
+      notify: Restart Nginx
+
+    - name: Disable default Nginx virtual host
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Restart Nginx
+
+    - name: Validate Nginx configuration
+      ansible.builtin.command: /usr/sbin/nginx -t
+      changed_when: false
+
+    - name: Enable and start Nginx
+      ansible.builtin.systemd_service:
+        name: nginx
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart Flask application
+      ansible.builtin.systemd_service:
+        name: flask-app
+        state: restarted
+        daemon_reload: true
+
+    - name: Restart Nginx
+      ansible.builtin.systemd_service:
+        name: nginx
+        state: restarted

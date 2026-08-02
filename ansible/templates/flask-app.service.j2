@@ -1,0 +1,15 @@
+[Unit]
+Description=Flask application
+After=network.target
+
+[Service]
+Type=simple
+User=flask
+Group=flask
+WorkingDirectory={{ flask_app_dir }}
+Environment=FLASK_PORT={{ flask_port }}
+ExecStart={{ flask_app_dir }}/.venv/bin/python {{ flask_app_dir }}/app.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
